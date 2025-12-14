@@ -1,0 +1,12 @@
+{
+    "name": "omniconnect-root",
+    "version": "1.0.0",
+    "description": "Root package for deployment",
+    "scripts": {
+        "install-client": "npm install --prefix client",
+        "build-client": "npm run build --prefix client",
+        "install-backend": "npm install --prefix backend",
+        "build": "npm run install-client && npm run build-client && npm run install-backend",
+        "start": "npm start --prefix backend"
+    }
+}
