@@ -237,23 +237,85 @@ function App() {
     }
   }
 
-  // ... stopScreenShare aynı kalabilir, userStream geri yüklenir ...
+  const stopScreenShare = async () => {
+    try {
+      const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const videoTrack = userStream.getVideoTracks()[0];
+      const audioTrack = userStream.getAudioTracks()[0];
 
-// ... render kısmı ...
+      Object.values(rtcService.peers).forEach(peer => {
+        const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack, videoSender);
+
+        const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
+        if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack, audioSender);
+      });
+      setLocalStream(userStream);
+      setScreenSharing(false);
+    } catch (err) { console.error("Error stopping screen share:", err); }
+  };
+
+  const leaveRoom = () => {
+    window.location.reload();
+  };
+
+  if (step === 'lobby') {
+    return (
+      <div className="container" style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="card" style={{ width: '400px', textAlign: 'center' }}>
+          <h1 style={{ marginBottom: '2rem', color: 'var(--accent)' }}>GörSem</h1>
+          <form onSubmit={handleJoinRoom} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <input
+              placeholder="Adınız"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Oda ID (örn: oda-1)"
+              value={roomId}
+              onChange={e => setRoomId(e.target.value)}
+              required
+            />
+            <button type="submit" className="btn btn-primary">Odaya Katıl</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        width: '100%'
+      }}>
+        <VideoRoom
+          localStream={localStream}
+          remoteStreams={remoteStreams}
+          remoteUsers={remoteUsers}
+          currentUser={username}
+        />
+
+        <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+          <div style={{ display: 'flex', gap: '1rem', background: 'rgba(0,0,0,0.5)', padding: '1rem', borderRadius: '1rem', backdropFilter: 'blur(10px)' }}>
 
             <button onClick={toggleAudio} className={`btn-icon ${!audioEnabled ? 'danger' : ''}`}>
               {audioEnabled ? '🎤' : (
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    🎤
-                    <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
+                  🎤
+                  <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
                 </div>
               )}
             </button>
             <button onClick={toggleVideo} className={`btn-icon ${!videoEnabled ? 'danger' : ''}`}>
               {videoEnabled ? '📷' : (
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    📷
-                    <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
+                  📷
+                  <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
                 </div>
               )}
             </button>
@@ -261,7 +323,7 @@ function App() {
               💻
             </button>
 
-  {/* CHAT BUTONU - YENİ */ }
+            {/* CHAT BUTONU - YENİ */}
             <button onClick={toggleChat} className="btn-icon" style={{ position: 'relative' }}>
               💬
               {unreadCount > 0 && !isChatOpen && (
@@ -291,30 +353,30 @@ function App() {
         </div >
       </div >
 
-    {/* Chat Drawer */ }
-  {
-    isChatOpen && (
-      <div style={{
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: '350px',
-        background: 'var(--bg-secondary)',
-        borderLeft: '1px solid #333',
-        zIndex: 99,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
-      }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>Sohbet</h3>
-          <button onClick={toggleChat} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✖</button>
-        </div>
-        <Chat messages={messages} sendMessage={handleSendMessage} />
-      </div>
-    )
-  }
+      {/* Chat Drawer */}
+      {
+        isChatOpen && (
+          <div style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: '350px',
+            background: 'var(--bg-secondary)',
+            borderLeft: '1px solid #333',
+            zIndex: 99,
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Sohbet</h3>
+              <button onClick={toggleChat} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✖</button>
+            </div>
+            <Chat messages={messages} sendMessage={handleSendMessage} />
+          </div>
+        )
+      }
     </div >
   );
 }
