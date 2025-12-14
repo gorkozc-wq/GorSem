@@ -6,16 +6,24 @@ const VideoCard = ({ stream, isLocal, username, connectionState }) => {
     useEffect(() => {
         if (videoRef.current && stream) {
             videoRef.current.srcObject = stream;
-            // Stream değiştiğinde veya yeni geldiğinde oynatmayı dene
-            videoRef.current.onloadedmetadata = async () => {
+
+            const handlePlay = async () => {
                 try {
                     await videoRef.current.play();
                 } catch (e) {
-                    console.error("Video play failed:", e);
+                    // console.error("Video play failed:", e); // Autoplay policy hatası olabilir, sessiz kalalım veya butonu gösterelim
                 }
             };
+
+            handlePlay();
+
+            // Bazen play asenkron kalır veya metadata yüklenince gerekir
+            videoRef.current.onloadedmetadata = handlePlay;
+
+            // Stream aktif mi kontrolü
+            // console.log("Stream tracks:", stream.getTracks());
         }
-    }, [stream]);
+    }, [stream, stream?.id, stream?.getTracks().length]);
 
     return (
         <div className="video-card" style={{

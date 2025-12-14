@@ -57,17 +57,16 @@ class WebRTCService {
 
         peer.ontrack = (event) => {
             console.log(`Track received from ${socketId}:`, event.track.kind);
-            // Bazen event.streams[0] boş gelebilir veya tarayıcı uyumsuzluğu olabilir.
-            // Garantilemek için track üzerinden stream oluşturalım.
-            let stream = event.streams[0];
-            if (!stream) {
-                console.log("Stream not found in event, creating new MediaStream from track");
-                stream = new MediaStream();
-                stream.addTrack(event.track);
-            }
+
+            // React'in değişikliği algılaması için her zaman yeni bir MediaStream nesnesi oluşturuyoruz.
+            // event.streams[0] kullansak bile referans aynı kalabildiği için useEffect tetiklenmeyebilir.
+            const newStream = new MediaStream(event.streams[0] ? event.streams[0].getTracks() : [event.track]);
+
+            // Eğer track stream'e sonradan eklenirse, yine de yeni bir nesne yollamalıyız.
+            // Ancak ontrack event'i her track için tetiklenir.
 
             if (this.onTrack) {
-                this.onTrack(socketId, stream);
+                this.onTrack(socketId, newStream);
             }
         };
 
