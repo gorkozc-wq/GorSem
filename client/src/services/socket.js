@@ -1,6 +1,11 @@
 import io from "socket.io-client";
 
-// Production'da (aynı domainden sunulurken) relative path, Dev'de localhost:5000
+// ----------------------------------------------------------------------
+// Socket URL Belirleme
+// ----------------------------------------------------------------------
+// Geliştirme ortamında (Dev) frontend 5173, backend 5000 portunda çalışır.
+// Bu yüzden manuel olarak localhost:5000'e bağlanırız.
+// Canlı ortamda (Production) frontend ve backend aynı sunucudadır, bu yüzden "/" (relative path) yeterlidir.
 const SOCKET_URL = import.meta.env.DEV
     ? (window.location.hostname === 'localhost' ? "http://localhost:5000" : `http://${window.location.hostname}:5000`)
     : "/";
@@ -47,4 +52,4 @@ class SocketService {
     }
 }
 
-export default new SocketService();
+export default new SocketService(); // Singleton: Uygulama boyunca tek bir socket yönetimi olsun

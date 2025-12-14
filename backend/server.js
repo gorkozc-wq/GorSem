@@ -8,22 +8,35 @@ const path = require('path');
 const app = express();
 app.use(cors());
 
-// Frontend Build Dosyalarını Sun
+// ----------------------------------------------------------------------
+// Frontend Build Dosyalarını Sun (DEPLOYMENT İÇİN)
+// ----------------------------------------------------------------------
+// Üretim ortamında (Production) frontend dosyaları 'client/dist' klasöründedir.
+// Express bu klasörü statik olarak dışarı açar, böylece ayrı bir frontend sunucusuna gerek kalmaz.
 const buildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(buildPath));
 
 // API rotaları buraya gelebilir...
 
-// SPA için her isteği index.html'e yönlendir (API hariç)
+// ----------------------------------------------------------------------
+// SPA (Single Page Application) Yönlendirmesi
+// ----------------------------------------------------------------------
+// React Router kullanıldığında, kullanıcı direkt bir alt sayfaya (örn: /room/1) girerse
+// sunucu bunu anlamaz. O yüzden API olmayan tüm istekleri index.html'e yönlendiriyoruz.
+// React bu noktada devreye girip doğru sayfayı gösterir.
 app.get('*', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 const server = http.createServer(app);
 
+// ----------------------------------------------------------------------
+// Socket.io Kurulumu & CORS (Güvenlik) Ayarları
+// ----------------------------------------------------------------------
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        // origin: "*", // Geliştirme aşamasında her yerden gelen isteği kabul et
+        origin: "*", // Canlı ortamda güvenlik için buraya kendi domaininizi yazabilirsiniz (örn: "https://gorsem.onrender.com")
         methods: ["GET", "POST"]
     }
 });
@@ -67,11 +80,22 @@ io.on('connection', (socket) => {
         socket.emit("all-users", otherUsers);
     });
 
+    // ----------------------------------------------------------------------
+    // WebRTC Sinyalleşme (Signaling) Events
+    // ----------------------------------------------------------------------
+    // WebRTC cihazlarının birbirini bulması ve bağlantı kurması için
+    // küçük veri paketlerini (SDP, Candidate) birbirlerine aktarmaları gerekir.
+    // Sunucu burada sadece "Postacı" görevi görür. İçeriği okumaz, sadece iletir.
+
+    // Arayan kişi (Caller) "Benim özelliklerim bunlar" der (Offer).
     socket.on("offer", (payload) => io.to(payload.target).emit("offer", payload));
+
+    // Aranan kişi (Callee) "Tamam, kabul ettim, benim özelliklerim de bunlar" der (Answer).
     socket.on("answer", (payload) => io.to(payload.target).emit("answer", payload));
+
+    // Bağlantı kurulurken "Hangi yoldan bağlanabilirim?" denemeleri (ICE Candidates).
+    // ÖNEMLİ: Bu paketin içine "Gönderen Kim?" (caller) bilgisini eklemek zorundayız!
     socket.on("ice-candidate", (payload) => {
-        // Alıcıya kimden geldiğini (caller) ekleyerek gönderelim.
-        // Client bu bilgiyi kullanarak doğru peer connection'a candidate ekler.
         const newPayload = { ...payload, caller: socket.id };
         io.to(payload.target).emit("ice-candidate", newPayload);
     });
@@ -121,6 +145,11 @@ io.on('connection', (socket) => {
     });
 });
 
+// ----------------------------------------------------------------------
+// Sunucuyu Başlatma
+// ----------------------------------------------------------------------
+// Bulut sunucular (Render, Heroku vb.) bize dinamik bir port atar.
+// Bu yüzden process.env.PORT kullanmalıyız. Yoksa varsayılan 5000 olsun.
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor`);

@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// ----------------------------------------------------------------------
+// Sohbet Componenti
+// ----------------------------------------------------------------------
+// Anlık mesajlaşma arayüzünü yönetir.
+// Mesajlar App.jsx'ten prop olarak gelir.
 const Chat = ({ messages, sendMessage }) => {
     const [newMessage, setNewMessage] = useState("");
     const messagesEndRef = useRef(null);

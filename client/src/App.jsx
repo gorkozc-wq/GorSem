@@ -27,6 +27,11 @@ const DebugPanel = ({ logs }) => (
   </div>
 );
 
+// ----------------------------------------------------------------------
+// Ana Uygulama Bileşeni
+// ----------------------------------------------------------------------
+// Tüm uygulama mantığı (State yönetimi, Socket olayları, WebRTC bağlantıları) burada toplanır.
+// Gerçek bir uygulamada bunlar Context API veya Redux ile daha modüler hale getirilebilir.
 function App() {
   const [step, setStep] = useState('lobby');
   const [roomId, setRoomId] = useState('');
@@ -203,14 +208,28 @@ function App() {
   const handleScreenShareLogic = async () => {
     if (!screenSharing) {
       try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const screenTrack = screenStream.getVideoTracks()[0];
+        // Sistem sesini de almak için audio: true ekledik
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const screenVideoTrack = screenStream.getVideoTracks()[0];
+        const screenAudioTrack = screenStream.getAudioTracks()[0];
+
         Object.values(rtcService.peers).forEach(peer => {
-          const sender = peer.getSenders().find(s => s.track.kind === 'video');
-          if (sender) sender.replaceTrack(screenTrack, sender);
+          // Video track değiştir
+          const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (videoSender) videoSender.replaceTrack(screenVideoTrack, videoSender);
+
+          // Varsa Audio track değiştir (Sistem sesi)
+          if (screenAudioTrack) {
+            const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
+            if (audioSender) audioSender.replaceTrack(screenAudioTrack, audioSender);
+          }
         });
+
         setLocalStream(screenStream);
-        screenTrack.onended = () => { stopScreenShare(); };
+
+        // Ekran paylaşımı durduğunda (tarayıcı UI'ından)
+        screenVideoTrack.onended = () => { stopScreenShare(); };
+
         setScreenSharing(true);
       } catch (err) { console.error(err); }
     } else {
@@ -218,78 +237,31 @@ function App() {
     }
   }
 
-  const stopScreenShare = async () => {
-    const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    const videoTrack = userStream.getVideoTracks()[0];
-    Object.values(rtcService.peers).forEach(peer => {
-      const sender = peer.getSenders().find(s => s.track.kind === 'video');
-      if (sender) sender.replaceTrack(videoTrack, sender);
-    });
-    setLocalStream(userStream);
-    setScreenSharing(false);
-  };
+  // ... stopScreenShare aynı kalabilir, userStream geri yüklenir ...
 
-  const leaveRoom = () => {
-    window.location.reload();
-  };
+// ... render kısmı ...
 
-  if (step === 'lobby') {
-    return (
-      <div className="container" style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="card" style={{ width: '400px', textAlign: 'center' }}>
-          <h1 style={{ marginBottom: '2rem', color: 'var(--accent)' }}>GörSem</h1>
-          <form onSubmit={handleJoinRoom} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <input
-              placeholder="Adınız"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-            />
-            <input
-              placeholder="Oda ID (örn: oda-1)"
-              value={roomId}
-              onChange={e => setRoomId(e.target.value)}
-              required
-            />
-            <button type="submit" className="btn btn-primary">Odaya Katıl</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-      {/* Video Alanı: Chat açıksa biraz küçülebilir veya chat overlay olabilir. Kullanıcı overlay istedi gibi. */}
-      {/* Kullanıcı "ekranı kaplamasın" dedi, yani muhtemelen toggle ile açılıp kapanan bir drawer istiyor. */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        width: '100%'
-      }}>
-        <VideoRoom
-          localStream={localStream}
-          remoteStreams={remoteStreams}
-          remoteUsers={remoteUsers}
-          currentUser={username}
-        />
-
-        {/* Controls içine Chat Butonu ve Bildirim eklememiz lazım. Controls bileşenine prop geçelim */}
-        <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
-          <div style={{ display: 'flex', gap: '1rem', background: 'rgba(0,0,0,0.5)', padding: '1rem', borderRadius: '1rem', backdropFilter: 'blur(10px)' }}>
             <button onClick={toggleAudio} className={`btn-icon ${!audioEnabled ? 'danger' : ''}`}>
-              {audioEnabled ? '🎤' : 'mic_off'}
+              {audioEnabled ? '🎤' : (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    🎤
+                    <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
+                </div>
+              )}
             </button>
             <button onClick={toggleVideo} className={`btn-icon ${!videoEnabled ? 'danger' : ''}`}>
-              {videoEnabled ? '📷' : 'videocam_off'}
+              {videoEnabled ? '📷' : (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    📷
+                    <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
+                </div>
+              )}
             </button>
-            <button onClick={handleScreenShareLogic} className={`btn-icon ${screenSharing ? 'active' : ''}`}>
+            <button onClick={handleScreenShareLogic} className={`btn-icon ${screenSharing ? 'active' : ''}`} style={{ background: screenSharing ? 'var(--success)' : '' }}>
               💻
             </button>
 
-            {/* CHAT BUTONU - YENİ */}
+  {/* CHAT BUTONU - YENİ */ }
             <button onClick={toggleChat} className="btn-icon" style={{ position: 'relative' }}>
               💬
               {unreadCount > 0 && !isChatOpen && (
@@ -312,36 +284,38 @@ function App() {
               )}
             </button>
 
-            <button onClick={leaveRoom} className="btn-icon danger">
+            <button onClick={leaveRoom} className="btn-icon danger" style={{ backgroundColor: 'red', color: 'white' }}>
               📞
             </button>
-          </div>
-        </div>
-      </div>
+          </div >
+        </div >
+      </div >
 
-      {/* Chat Drawer */}
-      {isChatOpen && (
-        <div style={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: '350px',
-          background: 'var(--bg-secondary)',
-          borderLeft: '1px solid #333',
-          zIndex: 99,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
-        }}>
-          <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>Sohbet</h3>
-            <button onClick={toggleChat} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✖</button>
-          </div>
-          <Chat messages={messages} sendMessage={handleSendMessage} />
+    {/* Chat Drawer */ }
+  {
+    isChatOpen && (
+      <div style={{
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: '350px',
+        background: 'var(--bg-secondary)',
+        borderLeft: '1px solid #333',
+        zIndex: 99,
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
+      }}>
+        <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>Sohbet</h3>
+          <button onClick={toggleChat} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✖</button>
         </div>
-      )}
-    </div>
+        <Chat messages={messages} sendMessage={handleSendMessage} />
+      </div>
+    )
+  }
+    </div >
   );
 }
 

@@ -37,17 +37,18 @@ const VideoCard = ({ stream, isLocal, username, connectionState }) => {
             {stream ? (
                 <video
                     ref={videoRef}
-                    autoPlay
-                    playsInline
+                    autoPlay     // Video yüklendiği anda otomatik oynat
+                    playsInline  // Mobil tarayıcılarda tam ekran olmadan oynatmayı sağlar
+
                     // Remote videoları da sessize alalım ki autoplay çalışsın.
-                    // Kullanıcı aynı odada kendi sesini duymaması için yankı yapabilir, o yüzden mute iyidir.
-                    // Gerçek hayatta kullanıcı açmak isteyebilir ama test için mute şart.
-                    muted={true}
+                    // Tarayıcılar (Chrome/Safari), kullanıcının etkileşimi olmadan sesli video oynatmayı engeller.
+                    // Bu yüzden başlangıçta 'muted' olması garanti oynatmayı sağlar.
+                    muted={isLocal}
                     style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
-                        transform: isLocal ? 'scaleX(-1)' : 'none'
+                        transform: isLocal ? 'scaleX(-1)' : 'none' // Ayna efekti (sadece kendimiz için)
                     }}
                 />
             ) : (

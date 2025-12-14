@@ -8,6 +8,12 @@ class WebRTCService {
     onIceCandidate = null;
     onTrack = null;
 
+    // ----------------------------------------------------------------------
+    // STUN & TURN Sunucu Ayarları (NAT Traversal)
+    // ----------------------------------------------------------------------
+    // WebRTC cihazlarının internet üzerinden birbirini bulması için "buz kırıcı" (ICE) sunuculara ihtiyaç duyar.
+    // STUN: "Benim dış IP adresim ne?" sorusunu cevaplar. (Google sunucuları ücretsiz ve hızlıdır)
+    // TURN: Eğer güvenlik duvarı (Firewall) çok sıkıysa, veriyi bu sunucu üzerinden geçirir. (OpenRelay ücretsiz kullanıyoruz)
     config = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -30,6 +36,7 @@ class WebRTCService {
         ]
     };
 
+    // Kullanıcının Kamera ve Mikrofonuna erişim isteği
     initializeLocalStream = async (video = true, audio = true) => {
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
@@ -49,12 +56,15 @@ class WebRTCService {
         console.log(`Creating new peer connection for ${socketId}`);
         const peer = new RTCPeerConnection(this.config);
 
+        // ICE Candidate: Bağlantı yolu adayları bulunduğunda tetiklenir.
+        // Bunu socket üzerinden karşı tarafa yollamalıyız.
         peer.onicecandidate = (event) => {
             if (event.candidate && this.onIceCandidate) {
                 this.onIceCandidate(socketId, event.candidate);
             }
         };
 
+        // Karşı taraftan görüntü/ses geldiğinde tetiklenir (TRACK).
         peer.ontrack = (event) => {
             console.log(`Track received from ${socketId}:`, event.track.kind);
 
@@ -150,7 +160,9 @@ class WebRTCService {
             const peer = this.peers[socketId];
             const iceCandidate = new RTCIceCandidate(candidate);
 
-            // Peer yoksa veya remote description henüz set edilmediyse kuyruğa ekle
+            // Peer yoksa veya remote description henüz set edilmediyse kuyruğa ekle.
+            // Bu "Trickle ICE" mantığı için kritiktir. Bazen candidate'ler, Offer/Answer'dan önce gelir.
+            // Onları kaybetmemek için bir kuyrukta (queue) bekletiriz.
             if (!peer || !peer.remoteDescription) {
                 console.warn(`Queueing ICE candidate for ${socketId} (Remote desc not ready)`);
                 if (!this.candidatesQueue[socketId]) {
