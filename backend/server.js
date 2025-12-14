@@ -69,7 +69,12 @@ io.on('connection', (socket) => {
 
     socket.on("offer", (payload) => io.to(payload.target).emit("offer", payload));
     socket.on("answer", (payload) => io.to(payload.target).emit("answer", payload));
-    socket.on("ice-candidate", (payload) => io.to(payload.target).emit("ice-candidate", payload));
+    socket.on("ice-candidate", (payload) => {
+        // Alıcıya kimden geldiğini (caller) ekleyerek gönderelim.
+        // Client bu bilgiyi kullanarak doğru peer connection'a candidate ekler.
+        const newPayload = { ...payload, caller: socket.id };
+        io.to(payload.target).emit("ice-candidate", newPayload);
+    });
 
     socket.on("send-message", (payload) => {
         let senderName = "Anonim";
