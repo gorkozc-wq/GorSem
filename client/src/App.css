@@ -80,19 +80,16 @@
 
 /* Chat Sidebar */
 .chat-sidebar {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  /* Desktop: Relative positioning to push content */
+  position: relative;
   width: 350px;
   background: var(--bg-secondary);
   border-left: 1px solid #333;
   z-index: 200;
-  /* Higher than controls */
   display: flex;
   flex-direction: column;
   box-shadow: -4px 0 15px rgba(0, 0, 0, 0.5);
-  transition: transform 0.3s ease-in-out;
+  transition: width 0.3s ease-in-out;
 }
 
 .chat-header {
@@ -114,8 +111,12 @@
 /* Responsive Chat */
 @media (max-width: 768px) {
   .chat-sidebar {
+    /* Mobile: Absolute positioning to overlay content */
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
     width: 100%;
-    /* Full screen on mobile */
   }
 }
 
@@ -180,7 +181,8 @@
 }
 
 .local-video {
-  transform: scaleX(-1);
+  /* Mirror effect removed */
+  transform: none;
 }
 
 .video-placeholder {
