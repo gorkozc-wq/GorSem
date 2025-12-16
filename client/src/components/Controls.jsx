@@ -10,19 +10,7 @@ const Controls = ({
     onLeave
 }) => {
     return (
-        <div className="controls-bar" style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: '1rem',
-            background: 'var(--bg-secondary)',
-            padding: '1rem',
-            borderRadius: '2rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            zIndex: 100
-        }}>
+        <div className="controls-bar">
             <button
                 className={`btn-icon ${!audioEnabled ? 'btn-danger' : ''}`}
                 onClick={onToggleAudio}

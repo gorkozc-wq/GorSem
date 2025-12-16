@@ -261,10 +261,10 @@ function App() {
 
   if (step === 'lobby') {
     return (
-      <div className="container" style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="card" style={{ width: '400px', textAlign: 'center' }}>
-          <h1 style={{ marginBottom: '2rem', color: 'var(--accent)' }}>GörSem</h1>
-          <form onSubmit={handleJoinRoom} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="lobby-container">
+        <div className="card lobby-card">
+          <h1 className="lobby-title">GörSem</h1>
+          <form onSubmit={handleJoinRoom} className="lobby-form">
             <input
               placeholder="Adınız"
               value={username}
@@ -285,14 +285,8 @@ function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        width: '100%'
-      }}>
+    <div className="main-layout">
+      <div className="content-area">
         <VideoRoom
           localStream={localStream}
           remoteStreams={remoteStreams}
@@ -300,8 +294,8 @@ function App() {
           currentUser={username}
         />
 
-        <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
-          <div style={{ display: 'flex', gap: '1rem', background: 'rgba(0,0,0,0.5)', padding: '1rem', borderRadius: '1rem', backdropFilter: 'blur(10px)' }}>
+        <div className="controls-container">
+          <div className="controls-content">
 
             <button onClick={toggleAudio} className={`btn-icon ${!audioEnabled ? 'danger' : ''}`}>
               {audioEnabled ? '🎤' : (
@@ -327,20 +321,7 @@ function App() {
             <button onClick={toggleChat} className="btn-icon" style={{ position: 'relative' }}>
               💬
               {unreadCount > 0 && !isChatOpen && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  background: 'red',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '20px',
-                  height: '20px',
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+                <span className="notification-badge">
                   {unreadCount}
                 </span>
               )}
@@ -356,22 +337,10 @@ function App() {
       {/* Chat Drawer */}
       {
         isChatOpen && (
-          <div style={{
-            position: 'absolute',
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: '350px',
-            background: 'var(--bg-secondary)',
-            borderLeft: '1px solid #333',
-            zIndex: 99,
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
-          }}>
-            <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="chat-sidebar">
+            <div className="chat-header">
               <h3 style={{ margin: 0 }}>Sohbet</h3>
-              <button onClick={toggleChat} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✖</button>
+              <button onClick={toggleChat} className="close-chat-btn">✖</button>
             </div>
             <Chat messages={messages} sendMessage={handleSendMessage} />
           </div>
