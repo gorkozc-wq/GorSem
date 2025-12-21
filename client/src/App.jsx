@@ -32,7 +32,7 @@ const DebugPanel = ({ logs }) => (
 // ----------------------------------------------------------------------
 // Tüm uygulama mantığı (State yönetimi, Socket olayları, WebRTC bağlantıları) burada toplanır.
 // Gerçek bir uygulamada bunlar Context API veya Redux ile daha modüler hale getirilebilir.
-const MeetingHeader = ({ roomId }) => {
+const MeetingHeader = ({ roomId, participantCount }) => {
   const [time, setTime] = useState('00:00:00');
 
   useEffect(() => {
@@ -56,6 +56,8 @@ const MeetingHeader = ({ roomId }) => {
         </div>
         <div className="divider"></div>
         <h2 className="room-title">{roomId || 'Toplantı'}</h2>
+        <div className="divider"></div>
+        <span className="participant-badge">👤 {participantCount} Kişi</span>
       </div>
     </div>
   );
@@ -143,7 +145,6 @@ function App() {
     });
 
     socketService.socket.on("all-users", (users) => {
-      console.log("All users received:", users);
       const usersMap = {};
       users.forEach(u => { usersMap[u.socketId] = u.username; });
       setRemoteUsers(usersMap);
@@ -251,13 +252,12 @@ function App() {
           try {
             const remoteVideos = document.querySelectorAll('.video-element:not([data-socket-id="local"])');
             if (remoteVideos.length > 0 && document.pictureInPictureEnabled) {
-              // En az bir uzaktaki kullanıcı varsa ilkini PiP yap
               await remoteVideos[0].requestPictureInPicture();
             }
           } catch (pipErr) {
-            console.warn("Auto-PiP failed:", pipErr);
+            console.warn("Auto-PiP ignored:", pipErr);
           }
-        }, 1000); // Videonun render edilmesi için kısa bir süre bekle
+        }, 1500);
       } catch (err) { console.error(err); }
     } else {
       stopScreenShare();
@@ -310,7 +310,7 @@ function App() {
 
   return (
     <div className="main-layout vertical">
-      <MeetingHeader roomId={roomId} />
+      <MeetingHeader roomId={roomId} participantCount={Object.keys(remoteUsers).length + 1} />
 
       <div className="content-area horizontal">
         <VideoRoom

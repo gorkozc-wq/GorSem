@@ -1,7 +1,6 @@
 class WebRTCService {
     peers = {}; // socketId -> RTCPeerConnection
     candidatesQueue = {}; // socketId -> [RTCIceCandidate]
-    remoteStreams = {}; // socketId -> MediaStream (Kalıcı stream objeleri)
 
     localStream = null;
 
@@ -69,19 +68,15 @@ class WebRTCService {
         peer.ontrack = (event) => {
             console.log(`Track received from ${socketId}:`, event.track.kind);
 
-            // Eğer bu kullanıcı için henüz bir stream oluşmadıysa oluştur
-            if (!this.remoteStreams[socketId]) {
-                this.remoteStreams[socketId] = new MediaStream();
-            }
+            // React'in değişikliği algılaması için her zaman yeni bir MediaStream nesnesi oluşturuyoruz.
+            // event.streams[0] kullansak bile referans aynı kalabildiği için useEffect tetiklenmeyebilir.
+            const newStream = new MediaStream(event.streams[0] ? event.streams[0].getTracks() : [event.track]);
 
-            // Gelen track'i mevcut stream'e ekle
-            this.remoteStreams[socketId].addTrack(event.track);
+            // Eğer track stream'e sonradan eklenirse, yine de yeni bir nesne yollamalıyız.
+            // Ancak ontrack event'i her track için tetiklenir.
 
             if (this.onTrack) {
-                // React'in değişikliği algılaması için her zaman YENİ bir MediaStream nesnesi (farklı referans) yolluyoruz.
-                // Ancak içindeki track'ler aynı kalıyor.
-                const updatedStream = new MediaStream(this.remoteStreams[socketId].getTracks());
-                this.onTrack(socketId, updatedStream);
+                this.onTrack(socketId, newStream);
             }
         };
 
@@ -190,9 +185,6 @@ class WebRTCService {
         }
         if (this.candidatesQueue[socketId]) {
             delete this.candidatesQueue[socketId];
-        }
-        if (this.remoteStreams[socketId]) {
-            delete this.remoteStreams[socketId];
         }
     }
 }
