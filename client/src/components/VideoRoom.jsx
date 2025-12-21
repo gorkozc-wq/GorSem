@@ -12,7 +12,19 @@ const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSi
             handlePlay();
             videoRef.current.onloadedmetadata = handlePlay;
         }
-    }, [stream, stream?.id, stream?.getTracks().length]);
+    }, [stream, stream?.id]);
+
+    const togglePiP = async () => {
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else if (videoRef.current) {
+                await videoRef.current.requestPictureInPicture();
+            }
+        } catch (error) {
+            console.error('PiP Error:', error);
+        }
+    };
 
     return (
         <div className={`video-card ${isLocal ? 'is-local' : ''} ${isSidebar ? 'is-sidebar' : ''}`}>
@@ -23,6 +35,7 @@ const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSi
                     playsInline
                     muted={isLocal}
                     className="video-element"
+                    data-socket-id={!isLocal ? stream?.id : 'local'}
                 />
             ) : (
                 <div className="video-placeholder">
@@ -38,6 +51,18 @@ const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSi
                 </span>
                 {!isLocal && connectionState !== 'connected' && (
                     <span className="connection-mini-status">Bağlanıyor...</span>
+                )}
+                {stream && document.pictureInPictureEnabled && (
+                    <button
+                        className="pip-btn"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            togglePiP();
+                        }}
+                        title="Resim içinde Resim"
+                    >
+                        🖼️
+                    </button>
                 )}
             </div>
         </div>

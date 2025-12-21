@@ -244,6 +244,19 @@ function App() {
         setLocalStream(screenStream);
         screenVideoTrack.onended = () => { stopScreenShare(); };
         setScreenSharing(true);
+
+        // Auto-PiP: Ekran paylaşımı başladığında diğer kişinin videosunu PiP yap
+        setTimeout(async () => {
+          try {
+            const remoteVideos = document.querySelectorAll('.video-element:not([data-socket-id="local"])');
+            if (remoteVideos.length > 0 && document.pictureInPictureEnabled) {
+              // En az bir uzaktaki kullanıcı varsa ilkini PiP yap
+              await remoteVideos[0].requestPictureInPicture();
+            }
+          } catch (pipErr) {
+            console.warn("Auto-PiP failed:", pipErr);
+          }
+        }, 1000); // Videonun render edilmesi için kısa bir süre bekle
       } catch (err) { console.error(err); }
     } else {
       stopScreenShare();
