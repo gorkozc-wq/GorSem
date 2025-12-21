@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSidebar }) => {
+const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSidebar, peerId }) => {
     const videoRef = useRef();
 
     useEffect(() => {
@@ -35,7 +35,7 @@ const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSi
                     playsInline
                     muted={isLocal}
                     className="video-element"
-                    data-socket-id={!isLocal ? stream?.id : 'local'}
+                    data-peer-id={!isLocal ? peerId : 'local'}
                 />
             ) : (
                 <div className="video-placeholder">
@@ -93,6 +93,7 @@ const VideoRoom = ({ localStream, remoteStreams, remoteUsers, currentUser }) => 
                 {mainParticipants.map(([id, username]) => (
                     <VideoCard
                         key={id}
+                        peerId={id}
                         stream={remoteStreams[id]}
                         isLocal={false}
                         username={username}
@@ -106,6 +107,7 @@ const VideoRoom = ({ localStream, remoteStreams, remoteUsers, currentUser }) => 
                     {sidebarParticipants.map(([id, username]) => (
                         <VideoCard
                             key={id}
+                            peerId={id}
                             stream={remoteStreams[id]}
                             isLocal={false}
                             username={username}

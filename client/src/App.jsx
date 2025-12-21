@@ -229,52 +229,138 @@ function App() {
     }
   }
 
+  // Mixleme Değişkenleri (Ref ile saklıyoruz ki cleanup kolay olsun)
+  const mixingRefs = useRef({
+    audioCtx: null,
+    animationId: null,
+    canvas: null,
+    screenVideo: null,
+    cameraVideo: null
+  });
+
   const handleScreenShareLogic = async () => {
     if (!screenSharing) {
       try {
+        // 1. Ekran ve Sistem Sesini Al
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         const screenVideoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
+
+        // 2. Mevcut Kamera ve Mikrofonu Al (Eğer varsa)
+        const micTrack = localStream?.getAudioTracks()[0];
+        const cameraTrack = localStream?.getVideoTracks()[0];
+
+        // 3. Audio Mixleme (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        mixingRefs.current.audioCtx = audioCtx;
+        const dest = audioCtx.createMediaStreamDestination();
+
+        if (micTrack) {
+          const micSource = audioCtx.createMediaStreamSource(new MediaStream([micTrack]));
+          micSource.connect(dest);
+        }
+        if (screenAudioTrack) {
+          const screenAudioSource = audioCtx.createMediaStreamSource(new MediaStream([screenAudioTrack]));
+          screenAudioSource.connect(dest);
+        }
+
+        // 4. Video Mixleme (Canvas)
+        const canvas = document.createElement('canvas');
+        mixingRefs.current.canvas = canvas;
+        const ctx = canvas.getContext('2d');
+
+        const screenVideo = document.createElement('video');
+        screenVideo.srcObject = new MediaStream([screenVideoTrack]);
+        screenVideo.play();
+        mixingRefs.current.screenVideo = screenVideo;
+
+        const cameraVideo = document.createElement('video');
+        if (cameraTrack) {
+          cameraVideo.srcObject = new MediaStream([cameraTrack]);
+          cameraVideo.play();
+          mixingRefs.current.cameraVideo = cameraVideo;
+        }
+
+        const render = () => {
+          if (!screenVideoTrack.enabled || screenVideoTrack.readyState === 'ended') return;
+
+          const settings = screenVideoTrack.getSettings();
+          canvas.width = settings.width || 1280;
+          canvas.height = settings.height || 720;
+
+          // Ana Ekranı Çiz
+          ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+
+          // Kamerayı Sağ Alt Köşeye Çiz (Overlay)
+          if (cameraTrack && cameraTrack.enabled) {
+            const camW = canvas.width / 4;
+            const camH = (camW * 9) / 16;
+            const padding = 20;
+            ctx.fillStyle = "#000";
+            ctx.fillRect(canvas.width - camW - padding - 2, canvas.height - camH - padding - 2, camW + 4, camH + 4);
+            ctx.drawImage(cameraVideo, canvas.width - camW - padding, canvas.height - camH - padding, camW, camH);
+          }
+
+          mixingRefs.current.animationId = requestAnimationFrame(render);
+        };
+        render();
+
+        const mixedVideoTrack = canvas.captureStream(30).getVideoTracks()[0];
+        const mixedAudioTrack = dest.stream.getAudioTracks()[0];
+
+        // 5. Kanalları Değiştir
         Object.values(rtcService.peers).forEach(peer => {
           const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-          if (videoSender) videoSender.replaceTrack(screenVideoTrack, videoSender);
-          if (screenAudioTrack) {
+          if (videoSender) videoSender.replaceTrack(mixedVideoTrack);
+          if (mixedAudioTrack) {
             const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
-            if (audioSender) audioSender.replaceTrack(screenAudioTrack, audioSender);
+            if (audioSender) audioSender.replaceTrack(mixedAudioTrack);
           }
         });
-        setLocalStream(screenStream);
-        screenVideoTrack.onended = () => { stopScreenShare(); };
+
+        const mixedStream = new MediaStream([mixedVideoTrack, mixedAudioTrack]);
+        setLocalStream(mixedStream);
         setScreenSharing(true);
+
+        screenVideoTrack.onended = () => { stopScreenShare(); };
 
         // Auto-PiP: Ekran paylaşımı başladığında diğer kişinin videosunu PiP yap
         setTimeout(async () => {
           try {
-            const remoteVideos = document.querySelectorAll('.video-element:not([data-socket-id="local"])');
+            const remoteVideos = document.querySelectorAll('.video-element[data-peer-id]');
             if (remoteVideos.length > 0 && document.pictureInPictureEnabled) {
               await remoteVideos[0].requestPictureInPicture();
             }
           } catch (pipErr) {
             console.warn("Auto-PiP ignored:", pipErr);
           }
-        }, 1500);
-      } catch (err) { console.error(err); }
+        }, 1000);
+      } catch (err) {
+        console.error("Screen Share Mixing Error:", err);
+        stopScreenShare();
+      }
     } else {
       stopScreenShare();
     }
   }
 
   const stopScreenShare = async () => {
+    // Cleanup Mixers
+    if (mixingRefs.current.animationId) cancelAnimationFrame(mixingRefs.current.animationId);
+    if (mixingRefs.current.audioCtx) mixingRefs.current.audioCtx.close();
+
     try {
       const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       const videoTrack = userStream.getVideoTracks()[0];
       const audioTrack = userStream.getAudioTracks()[0];
+
       Object.values(rtcService.peers).forEach(peer => {
         const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack, videoSender);
+        if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack);
         const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
-        if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack, audioSender);
+        if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack);
       });
+
       setLocalStream(userStream);
       setScreenSharing(false);
     } catch (err) { console.error(err); }
