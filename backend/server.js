@@ -107,7 +107,8 @@ io.on('connection', (socket) => {
         }
         io.to(payload.roomId).emit("receive-message", {
             message: payload.message,
-            sender: senderName
+            sender: senderName,
+            timestamp: payload.timestamp
         });
     });
 

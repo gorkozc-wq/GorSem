@@ -59,7 +59,16 @@ const Chat = ({ messages, sendMessage }) => {
                         fontSize: '0.9rem'
                     }}>
                         {!msg.isMe && <div style={{ fontSize: '0.7rem', opacity: 0.7, marginBottom: '2px' }}>{msg.sender}</div>}
-                        {msg.message}
+                        <div className="message-text">{msg.message}</div>
+                        <div style={{
+                            fontSize: '0.65rem',
+                            opacity: 0.6,
+                            textAlign: 'right',
+                            marginTop: '4px',
+                            fontWeight: 'normal'
+                        }}>
+                            {msg.timestamp || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                     </div>
                 ))}
                 <div ref={messagesEndRef} />

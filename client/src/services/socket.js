@@ -35,7 +35,8 @@ class SocketService {
 
     sendMessage(roomId, message, sender) {
         if (!this.socket) return;
-        this.socket.emit("send-message", { roomId, message, sender });
+        const timestamp = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        this.socket.emit("send-message", { roomId, message, sender, timestamp });
     }
 
     // WebRTC Signaling

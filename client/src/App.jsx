@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import socketService from './services/socket';
 import rtcService from './services/webrtc';
 import VideoRoom from './components/VideoRoom';
-import Controls from './components/Controls';
 import Chat from './components/Chat';
+import './App.css';
 
 // Basit bir Debug Logger
 const DebugPanel = ({ logs }) => (
@@ -32,67 +32,120 @@ const DebugPanel = ({ logs }) => (
 // ----------------------------------------------------------------------
 // Tüm uygulama mantığı (State yönetimi, Socket olayları, WebRTC bağlantıları) burada toplanır.
 // Gerçek bir uygulamada bunlar Context API veya Redux ile daha modüler hale getirilebilir.
+const MeetingHeader = ({ roomId }) => {
+  const [time, setTime] = useState('00:00:00');
+
+  useEffect(() => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const diff = Date.now() - start;
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      setTime(`${h}:${m}:${s}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="teams-header">
+      <div className="header-left">
+        <div className="meeting-info">
+          <span className="recording-dot"></span>
+          <span className="timer">{time}</span>
+        </div>
+        <div className="divider"></div>
+        <h2 className="room-title">{roomId || 'Toplantı'}</h2>
+      </div>
+    </div>
+  );
+};
+
+const BottomControls = ({ audioEnabled, toggleAudio, videoEnabled, toggleVideo, screenSharing, handleScreenShare, leaveRoom, isChatOpen, toggleChat, unreadCount }) => {
+  return (
+    <div className="bottom-bar">
+      <div className="pill-controls">
+        <button onClick={toggleVideo} className={`btn-icon large ${!videoEnabled ? 'danger' : ''}`} title="Camera">
+          {videoEnabled ? '📹' : '🚫'}
+        </button>
+        <button onClick={toggleAudio} className={`btn-icon large ${!audioEnabled ? 'danger' : ''}`} title="Mic">
+          {audioEnabled ? '🎤' : '🚫'}
+        </button>
+        <button onClick={handleScreenShare} className={`btn-icon large ${screenSharing ? 'active' : ''}`} title="Share">
+          📤
+        </button>
+        <button onClick={toggleChat} className={`btn-icon large ${isChatOpen ? 'active' : ''}`} style={{ position: 'relative' }} title="Chat">
+          💬
+          {unreadCount > 0 && !isChatOpen && <span className="notification-badge">{unreadCount}</span>}
+        </button>
+        <div className="control-divider"></div>
+        <button onClick={leaveRoom} className="btn-leave-round" title="Leave">
+          📞
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const DynamicInput = ({ placeholder, value, onChange, required }) => {
+  const spanRef = useRef();
+  const [width, setWidth] = useState('auto');
+
+  useEffect(() => {
+    if (spanRef.current) {
+      // Calculate width based on hidden span + padding
+      const newWidth = Math.max(150, spanRef.current.offsetWidth + 30);
+      setWidth(`${newWidth}px`);
+    }
+  }, [value, placeholder]);
+
+  return (
+    <div className="dynamic-input-container">
+      <span ref={spanRef} className="width-measure">
+        {value || placeholder}
+      </span>
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        required={required}
+        style={{ width }}
+        className="dynamic-input"
+      />
+    </div>
+  );
+};
+
 function App() {
   const [step, setStep] = useState('lobby');
   const [roomId, setRoomId] = useState('');
   const [username, setUsername] = useState('');
   const [localStream, setLocalStream] = useState(null);
-
   const [remoteStreams, setRemoteStreams] = useState({});
   const [remoteUsers, setRemoteUsers] = useState({});
-
-  // Chat State
   const [messages, setMessages] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
 
-  const [logs, setLogs] = useState([]);
-  // Log fonksiyonunu production'da kapatabiliriz ama debug için kalsın
-  const addLog = (msg) => {
-    // console.log(`[APP LOG] ${msg}`); // Console kirliliğini azaltalım
-  };
-
   useEffect(() => {
-    if (!socketService.socket) {
-      socketService.connect();
-    }
-
+    if (!socketService.socket) socketService.connect();
     socketService.socket.removeAllListeners();
 
-    socketService.socket.on("connect", () => addLog("Socket connected"));
-
-    // Bağlantı koparsa remote userları resetle ki ghost user kalmasın
-    socketService.socket.on("disconnect", () => {
-      addLog("Socket disconnected");
-      setRemoteStreams({});
-      setRemoteUsers({});
-    });
-
     socketService.socket.on("user-connected", async ({ socketId, username }) => {
-      addLog(`User connected: ${username}`);
       setRemoteUsers(prev => ({ ...prev, [socketId]: username }));
-
       try {
         const offer = await rtcService.createOffer(socketId);
-        socketService.sendOffer({
-          target: socketId,
-          caller: socketService.socket.id,
-          sdp: offer
-        });
+        socketService.sendOffer({ target: socketId, caller: socketService.socket.id, sdp: offer });
       } catch (err) { console.error(err); }
     });
 
     socketService.socket.on("all-users", (users) => {
-      // Sunucudan güncel liste geldiğinde state'i tamamen yenile
       const usersMap = {};
-      users.forEach(u => {
-        usersMap[u.socketId] = u.username;
-      });
-      setRemoteUsers(usersMap); // Spread yerine direkt atama yaptık ki eskiler silinsin
+      users.forEach(u => { usersMap[u.socketId] = u.username; });
+      setRemoteUsers(usersMap);
     });
 
     socketService.socket.on("offer", async (payload) => {
@@ -103,13 +156,11 @@ function App() {
     });
 
     socketService.socket.on("answer", async (payload) => {
-      try { await rtcService.addAnswer(payload.caller, payload.sdp); }
-      catch (err) { console.error(err); }
+      try { await rtcService.addAnswer(payload.caller, payload.sdp); } catch (err) { console.error(err); }
     });
 
     socketService.socket.on("ice-candidate", async (payload) => {
-      try { await rtcService.addIceCandidate(payload.caller, payload.candidate); }
-      catch (err) { console.error(err); }
+      try { await rtcService.addIceCandidate(payload.caller, payload.candidate); } catch (err) { console.error(err); }
     });
 
     socketService.socket.on("user-disconnected", (socketId) => {
@@ -127,21 +178,14 @@ function App() {
     });
 
     socketService.socket.on("room-closed", () => {
-      alert("Oda sahibi ayrıldı, oda kapatılıyor.");
+      alert("Oda kapatıldı.");
       window.location.reload();
     });
 
     socketService.socket.on("receive-message", (data) => {
       setMessages(prev => [...prev, { ...data, isMe: data.sender === socketService.socket.id || data.sender === username }]);
-
-      // Chat kapalıysa bildirim sayısını artır
-      if (!isChatOpen) { // Not: State closure sorunu olabilir, ref kullanmak daha güvenli olabilir ama basit tutalım.
-        setUnreadCount(prev => prev + 1);
-      }
+      if (!isChatOpen) setUnreadCount(prev => prev + 1);
     });
-
-    // Chat açıldığında unread'i sıfırlamak için useEffect
-    // (Aşağıda isChatOpen değişince sıfırlayacağız)
 
     rtcService.onTrack = (socketId, stream) => {
       setRemoteStreams(prev => ({ ...prev, [socketId]: stream }));
@@ -151,41 +195,23 @@ function App() {
       socketService.sendIceCandidate({ target: targetId, candidate: candidate });
     };
 
-    return () => {
-      if (socketService.socket) {
-        socketService.socket.removeAllListeners();
-      }
-    }
-  }, []); // Mount only
+    return () => { if (socketService.socket) socketService.socket.removeAllListeners(); }
+  }, []);
 
-  useEffect(() => {
-    if (isChatOpen) {
-      setUnreadCount(0);
-    }
-  }, [isChatOpen]);
-
+  useEffect(() => { if (isChatOpen) setUnreadCount(0); }, [isChatOpen]);
 
   const handleJoinRoom = async (e) => {
     e.preventDefault();
     if (!roomId || !username) return;
-
     try {
       const stream = await rtcService.initializeLocalStream();
       setLocalStream(stream);
-      addLog("Local stream acquired");
-    } catch (err) {
-      addLog(`Media access failed/denied: ${err.message}. Joining as viewer.`);
-      // alert("Kamera/Mikrofon erişimi sağlanamadı!");
-    }
-
-    // Her durumda odaya katıl
+    } catch (err) { console.error(err); }
     socketService.joinRoom(roomId, username);
     setStep('room');
   };
 
-  const handleSendMessage = (msg) => {
-    socketService.sendMessage(roomId, msg, username);
-  };
+  const handleSendMessage = (msg) => socketService.sendMessage(roomId, msg, username);
 
   const toggleAudio = () => {
     if (localStream) {
@@ -201,35 +227,22 @@ function App() {
     }
   }
 
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-  };
-
   const handleScreenShareLogic = async () => {
     if (!screenSharing) {
       try {
-        // Sistem sesini de almak için audio: true ekledik
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         const screenVideoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
-
         Object.values(rtcService.peers).forEach(peer => {
-          // Video track değiştir
           const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
           if (videoSender) videoSender.replaceTrack(screenVideoTrack, videoSender);
-
-          // Varsa Audio track değiştir (Sistem sesi)
           if (screenAudioTrack) {
             const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
             if (audioSender) audioSender.replaceTrack(screenAudioTrack, audioSender);
           }
         });
-
         setLocalStream(screenStream);
-
-        // Ekran paylaşımı durduğunda (tarayıcı UI'ından)
         screenVideoTrack.onended = () => { stopScreenShare(); };
-
         setScreenSharing(true);
       } catch (err) { console.error(err); }
     } else {
@@ -242,42 +255,39 @@ function App() {
       const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       const videoTrack = userStream.getVideoTracks()[0];
       const audioTrack = userStream.getAudioTracks()[0];
-
       Object.values(rtcService.peers).forEach(peer => {
         const videoSender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
         if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack, videoSender);
-
         const audioSender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
         if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack, audioSender);
       });
       setLocalStream(userStream);
       setScreenSharing(false);
-    } catch (err) { console.error("Error stopping screen share:", err); }
+    } catch (err) { console.error(err); }
   };
 
-  const leaveRoom = () => {
-    window.location.reload();
-  };
+  const leaveRoom = () => window.location.reload();
 
   if (step === 'lobby') {
     return (
       <div className="lobby-container">
-        <div className="card lobby-card">
+        <div className="lobby-content">
+          <img src="/logo.png" alt="Logo" className="lobby-logo" />
           <h1 className="lobby-title">GörSem</h1>
           <form onSubmit={handleJoinRoom} className="lobby-form">
-            <input
+            <DynamicInput
               placeholder="Adınız"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
             />
-            <input
-              placeholder="Oda ID (örn: oda-1)"
+            <DynamicInput
+              placeholder="Oda ID"
               value={roomId}
               onChange={e => setRoomId(e.target.value)}
               required
             />
-            <button type="submit" className="btn btn-primary">Odaya Katıl</button>
+            <button type="submit" className="btn btn-primary lobby-submit">Görüşmeye Katıl</button>
           </form>
         </div>
       </div>
@@ -285,8 +295,10 @@ function App() {
   }
 
   return (
-    <div className="main-layout">
-      <div className="content-area">
+    <div className="main-layout vertical">
+      <MeetingHeader roomId={roomId} />
+
+      <div className="content-area horizontal">
         <VideoRoom
           localStream={localStream}
           remoteStreams={remoteStreams}
@@ -294,59 +306,30 @@ function App() {
           currentUser={username}
         />
 
-        <div className="controls-container">
-          <div className="controls-content">
-
-            <button onClick={toggleAudio} className={`btn-icon ${!audioEnabled ? 'danger' : ''}`}>
-              {audioEnabled ? '🎤' : (
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  🎤
-                  <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
-                </div>
-              )}
-            </button>
-            <button onClick={toggleVideo} className={`btn-icon ${!videoEnabled ? 'danger' : ''}`}>
-              {videoEnabled ? '📷' : (
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  📷
-                  <span style={{ position: 'absolute', width: '100%', height: '2px', background: 'red', transform: 'rotate(45deg)' }}></span>
-                </div>
-              )}
-            </button>
-            <button onClick={handleScreenShareLogic} className={`btn-icon ${screenSharing ? 'active' : ''}`} style={{ background: screenSharing ? 'var(--success)' : '' }}>
-              💻
-            </button>
-
-            {/* CHAT BUTONU - YENİ */}
-            <button onClick={toggleChat} className="btn-icon" style={{ position: 'relative' }}>
-              💬
-              {unreadCount > 0 && !isChatOpen && (
-                <span className="notification-badge">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            <button onClick={leaveRoom} className="btn-icon danger" style={{ backgroundColor: 'red', color: 'white' }}>
-              📞
-            </button>
-          </div >
-        </div >
-      </div >
-
-      {/* Chat Drawer */}
-      {
-        isChatOpen && (
+        {isChatOpen && (
           <div className="chat-sidebar">
             <div className="chat-header">
               <h3 style={{ margin: 0 }}>Sohbet</h3>
-              <button onClick={toggleChat} className="close-chat-btn">✖</button>
+              <button onClick={() => setIsChatOpen(false)} className="close-chat-btn">✖</button>
             </div>
             <Chat messages={messages} sendMessage={handleSendMessage} />
           </div>
-        )
-      }
-    </div >
+        )}
+      </div>
+
+      <BottomControls
+        audioEnabled={audioEnabled}
+        toggleAudio={toggleAudio}
+        videoEnabled={videoEnabled}
+        toggleVideo={toggleVideo}
+        screenSharing={screenSharing}
+        handleScreenShare={handleScreenShareLogic}
+        leaveRoom={leaveRoom}
+        isChatOpen={isChatOpen}
+        toggleChat={() => setIsChatOpen(!isChatOpen)}
+        unreadCount={unreadCount}
+      />
+    </div>
   );
 }
 
