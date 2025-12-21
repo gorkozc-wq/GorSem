@@ -1,6 +1,7 @@
 class WebRTCService {
     peers = {}; // socketId -> RTCPeerConnection
     candidatesQueue = {}; // socketId -> [RTCIceCandidate]
+    remoteStreams = {}; // socketId -> MediaStream (Kalıcı stream objeleri)
 
     localStream = null;
 
@@ -68,21 +69,19 @@ class WebRTCService {
         peer.ontrack = (event) => {
             console.log(`Track received from ${socketId}:`, event.track.kind);
 
-            // ÖNEMLİ: React'in değişikliği algılaması için her zaman YENİ bir MediaStream nesnesi oluşturmalıyız.
-            // Ancak mevcut track'leri de korumalıyız.
-            let remoteStream = null;
-
-            if (event.streams && event.streams[0]) {
-                // Eğer event.streams varsa, içindeki tüm trackleri alıp yeni bir stream oluşturuyoruz.
-                // Bu sayede hem audio hem video track'leri korunur.
-                remoteStream = new MediaStream(event.streams[0].getTracks());
-            } else {
-                // Fallback: Sadece mevcut track'i al
-                remoteStream = new MediaStream([event.track]);
+            // Eğer bu kullanıcı için henüz bir stream oluşmadıysa oluştur
+            if (!this.remoteStreams[socketId]) {
+                this.remoteStreams[socketId] = new MediaStream();
             }
 
+            // Gelen track'i mevcut stream'e ekle
+            this.remoteStreams[socketId].addTrack(event.track);
+
             if (this.onTrack) {
-                this.onTrack(socketId, remoteStream);
+                // React'in değişikliği algılaması için her zaman YENİ bir MediaStream nesnesi (farklı referans) yolluyoruz.
+                // Ancak içindeki track'ler aynı kalıyor.
+                const updatedStream = new MediaStream(this.remoteStreams[socketId].getTracks());
+                this.onTrack(socketId, updatedStream);
             }
         };
 
@@ -191,6 +190,9 @@ class WebRTCService {
         }
         if (this.candidatesQueue[socketId]) {
             delete this.candidatesQueue[socketId];
+        }
+        if (this.remoteStreams[socketId]) {
+            delete this.remoteStreams[socketId];
         }
     }
 }

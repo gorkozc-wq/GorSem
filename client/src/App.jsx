@@ -143,6 +143,7 @@ function App() {
     });
 
     socketService.socket.on("all-users", (users) => {
+      console.log("All users received:", users);
       const usersMap = {};
       users.forEach(u => { usersMap[u.socketId] = u.username; });
       setRemoteUsers(usersMap);

@@ -72,6 +72,9 @@ const VideoCard = ({ stream, isLocal, username, connectionState, hasOthers, isSi
 const VideoRoom = ({ localStream, remoteStreams, remoteUsers, currentUser }) => {
     const remoteUserEntries = Object.entries(remoteUsers);
 
+    console.log("VideoRoom Render - Remote Users:", remoteUsers);
+    console.log("VideoRoom Render - Remote Streams:", Object.keys(remoteStreams));
+
     // Basit mantık: İlk 4 kişi ana gridde, geri kalanı sidebar'da
     const mainParticipants = remoteUserEntries.slice(0, 3); // 3 remote + 1 local = 4 main
     const sidebarParticipants = remoteUserEntries.slice(3);

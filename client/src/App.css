@@ -98,12 +98,7 @@
   justify-items: center;
 }
 
-/* Grid is alone (Single User) */
-.main-video-grid:only-child,
-.video-container:not(:has(.participants-sidebar)) .main-video-grid {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
+
 
 /* Sidebar Participants */
 .participants-sidebar {
